@@ -1,0 +1,56 @@
+Spring Integration with Java DSL support to send and process "Work Units" with a RabbitMQ broker mediating the transfer
+
+== Steps
+
+* Start RabbitMQ server:
+
+[source]
+----
+rabbitmq-server
+----
+
+* Start Zipkin
+
+[source]
+----
+docker run -d -p 9411:9411 openzipkin/zipkin
+----
+
+* Verify Zipkin url in work-dispatcher/src/main/resources/application.properties and work-handler/src/main/resources/application.properties
+
+[source]
+----
+spring.zipkin.base-url=http://192.168.99.100:9411/
+----
+
+
+* Start the Work Handler:
+
+[source]
+----
+cd work-handler
+mvn spring-boot:run
+----
+
+* Start the Work Dispatcher:
+
+[source]
+----
+cd work-dispatcher
+mvn spring-boot:run
+----
+
+
+* Create dummy work units by calling a controller endpoint:
+
+[source]
+----
+http://localhost:8080/generateWork?id=1&definition=test&throw_exception=false
+----
+
+* A throw exception flag will cause the "Work Unit" processor to throw an error. If that happens a complex flow is kicked off -
+
+- There is a Dead Letter exchange configured for the Work unit queue, the message from the dead letter exchange is routed to
+the Dead letter queue, dead letter queue has a ttl of 20 seconds and in-turn has the dead letter exchange configured to be the work units queue thus creating a nice cycle.
+The cycle of consuming messages is broken by adding in a filter in the processing flow to break processing after a set number of retries - 3 in this case.
+
